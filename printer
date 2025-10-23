@@ -1,0 +1,64 @@
+#include <iostream>
+#include <pthread.h>
+#include <unistd.h>
+#include <cstdlib>
+#include <ctime>
+#include <mutex>
+
+using namespace std;
+
+bool interruptPrinter = false;   // Printer interrupt flag
+bool maskPrinter = false;        // Mask flag (enable/disable)
+mutex mtx;
+
+void handleInterrupt() {
+    mtx.lock();
+    if (interruptPrinter && !maskPrinter) {
+        cout << "Printer Interrupt Triggered → Handling ISR → Completed\n";
+        interruptPrinter = false;
+    } else if (interruptPrinter && maskPrinter) {
+        cout << "Printer Interrupt Ignored (Masked)\n";
+        interruptPrinter = false;
+    }
+    mtx.unlock();
+}
+
+// Thread to simulate Printer interrupt generation
+void* printerDevice(void*) {
+    while (true) {
+        sleep(rand() % 6 + 2);  // Random delay (2–7 seconds)
+        mtx.lock();
+        interruptPrinter = true;
+        mtx.unlock();
+    }
+    return nullptr;
+}
+
+int main() {
+    srand(time(0));
+    pthread_t printerThread;
+
+    pthread_create(&printerThread, nullptr, printerDevice, nullptr);
+
+    cout << "=== Printer Interrupt Simulation Started ===\n";
+    cout << "Commands: [p] Toggle Mask, [q] Quit\n";
+
+    char command;
+    while (true) {
+        handleInterrupt();
+        usleep(300000); // Check every 0.3s
+
+        if (cin.peek() != EOF) {
+            cin >> command;
+            if (command == 'q')
+                break;
+            else if (command == 'p') {
+                maskPrinter = !maskPrinter;
+                cout << "Printer interrupt " << (maskPrinter ? "masked (disabled)\n" : "unmasked (enabled)\n");
+            }
+        }
+    }
+
+    cout << "=== Simulation Ended ===\n";
+    return 0;
+}
