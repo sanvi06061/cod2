@@ -1,0 +1,64 @@
+#include <iostream>
+#include <pthread.h>
+#include <unistd.h>
+#include <cstdlib>
+#include <ctime>
+#include <mutex>
+
+using namespace std;
+
+bool interruptMouse = false;  // Mouse interrupt flag
+bool maskMouse = false;       // Mask flag (disable/enable mouse interrupt)
+mutex mtx;
+
+void handleInterrupt() {
+    mtx.lock();
+    if (interruptMouse && !maskMouse) {
+        cout << "Mouse Interrupt Triggered → Handling ISR → Completed\n";
+        interruptMouse = false;
+    } else if (interruptMouse && maskMouse) {
+        cout << "Mouse Interrupt Ignored (Masked)\n";
+        interruptMouse = false;
+    }
+    mtx.unlock();
+}
+
+// Thread to simulate Mouse interrupt generation
+void* mouseDevice(void*) {
+    while (true) {
+        sleep(rand() % 5 + 1);  // Random delay (1–5 seconds)
+        mtx.lock();
+        interruptMouse = true;
+        mtx.unlock();
+    }
+    return nullptr;
+}
+
+int main() {
+    srand(time(0));
+    pthread_t mouseThread;
+
+    pthread_create(&mouseThread, nullptr, mouseDevice, nullptr);
+
+    cout << "=== Mouse Interrupt Simulation Started ===\n";
+    cout << "Commands: [m] Toggle Mask, [q] Quit\n";
+
+    char command;
+    while (true) {
+        handleInterrupt();
+        usleep(300000); // Check every 0.3s
+
+        if (cin.peek() != EOF) {
+            cin >> command;
+            if (command == 'q')
+                break;
+            else if (command == 'm') {
+                maskMouse = !maskMouse;
+                cout << "Mouse interrupt " << (maskMouse ? "masked (disabled)\n" : "unmasked (enabled)\n");
+            }
+        }
+    }
+
+    cout << "=== Simulation Ended ===\n";
+    return 0;
+}
